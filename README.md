@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://just-watch-alpha.vercel.app/">
+  <a href="https://just-watch.primacodes.com/">
     <img src="https://img.shields.io/badge/Live_Demo-Open_Just_Watch-91DFC2?style=for-the-badge&logo=vercel&logoColor=171B1F" alt="Open live demo" />
   </a>
 </p>
@@ -127,10 +127,14 @@ Support depends on the source website, its current extractor compatibility, acce
 
 ```text
 public/
-  index.html          Minimal user interface
+  index.html          Minimal interface, metadata, and JSON-LD
   styles.css          Responsive visual system
   app.js              Resolver flow and media player logic
   favicon.svg         Shared browser and application icon
+  og-image.png        1200 × 630 social sharing preview
+  robots.txt          Search crawler rules
+  sitemap.xml         Canonical production URL sitemap
+  site.webmanifest    Installable web application metadata
 
 api/
   resolve.js          Fast Node.js resolver and site adapters
@@ -143,6 +147,7 @@ scripts/
 
 tests/
   resolve.test.mjs    Fast resolver tests
+  seo.test.mjs        Canonical, metadata, sitemap, and OG tests
   test_universal.py   Universal resolver tests
 
 docs/assets/
@@ -238,7 +243,20 @@ Vercel detects:
 
 The current production deployment is available at:
 
-**https://just-watch-alpha.vercel.app/**
+**https://just-watch.primacodes.com/**
+
+### Search indexing and SEO
+
+The production domain is the canonical URL used by the HTML metadata, Open Graph tags, Twitter Card, JSON-LD structured data, robots file, and sitemap.
+
+```text
+Canonical: https://just-watch.primacodes.com/
+Robots:    https://just-watch.primacodes.com/robots.txt
+Sitemap:   https://just-watch.primacodes.com/sitemap.xml
+OG image:  https://just-watch.primacodes.com/og-image.png
+```
+
+After deployment, add the domain property to Google Search Console, inspect the canonical homepage URL, request indexing, and submit `/sitemap.xml`. Search rankings are determined by Google and cannot be guaranteed by technical metadata alone.
 
 ### Optional Cobalt configuration
 

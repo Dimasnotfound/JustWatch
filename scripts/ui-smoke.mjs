@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 const debuggerPort = Number(process.env.CHROME_DEBUG_PORT || 9223);
 const appUrl = process.env.APP_URL || "http://127.0.0.1:3000/";
 const sampleVideo = process.env.SAMPLE_VIDEO || "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+const canonicalUrl = process.env.CANONICAL_URL || "https://just-watch.primacodes.com/";
 const saveScreenshots = process.env.SAVE_SCREENSHOTS === "1";
 
 async function createTarget(url) {
@@ -150,6 +151,8 @@ const desktop = await evaluate(client, `(() => {
     formVisible: Boolean(document.querySelector("#resolver-form")?.getBoundingClientRect().height),
     resultInitiallyHidden: document.querySelector("#result-section")?.hidden === true,
     iconConsistent: Boolean(faviconHref && logoHref && faviconHref === logoHref),
+    canonicalMatches: document.querySelector("link[rel='canonical']")?.href === ${JSON.stringify(canonicalUrl)},
+    seoContentVisible: Boolean(document.querySelector(".seo-content")?.getBoundingClientRect().height),
     formAutocomplete: document.querySelector("#resolver-form")?.autocomplete,
     inputAutocomplete: document.querySelector("#video-url")?.autocomplete,
     localStorageEntries: localStorage.length,
@@ -228,6 +231,8 @@ if (
   !desktop.resolverVisible ||
   !desktop.formVisible ||
   !desktop.iconConsistent ||
+  !desktop.canonicalMatches ||
+  !desktop.seoContentVisible ||
   desktop.formAutocomplete !== "off" ||
   desktop.inputAutocomplete !== "off" ||
   desktop.localStorageEntries !== 0 ||
