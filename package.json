@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A layered media resolver and clean player for public, unprotected media.",
+  "license": "MIT",
   "scripts": {
     "setup:universal": "node scripts/setup-universal.mjs",
     "dev": "node server.mjs --port=3000",

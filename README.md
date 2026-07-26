@@ -24,6 +24,9 @@
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12" />
   <img src="https://img.shields.io/badge/yt--dlp-Universal_Resolver-FFCC00?style=flat-square" alt="yt-dlp universal resolver" />
   <img src="https://img.shields.io/badge/Deploy-Vercel-000000?style=flat-square&logo=vercel&logoColor=white" alt="Deployed on Vercel" />
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-91DFC2?style=flat-square" alt="MIT License" />
+  </a>
 </p>
 
 ---
@@ -331,3 +334,9 @@ Playback can also fail when:
 Use Just Watch only with media that you are authorized to access and play. Respect copyright, platform terms, creator rights, and applicable law.
 
 Just Watch is an independent portfolio project and is not affiliated with any similarly named streaming guide, hosting provider, or media platform.
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
+
+Copyright © 2026 Dimas Juli Pratama.
