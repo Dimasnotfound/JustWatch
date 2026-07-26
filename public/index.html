@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Just Watch resolves public media links and plays available sources directly from their original location."
+    />
+    <meta name="theme-color" content="#171b1f" />
+    <link rel="icon" href="/favicon.svg?v=3" type="image/svg+xml" sizes="any" />
+    <title>Just Watch</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <main>
+        <section class="resolver" aria-labelledby="page-title">
+          <div class="title-row">
+            <img class="title-logo" src="/favicon.svg?v=3" alt="" aria-hidden="true" />
+            <h1 id="page-title">Just Watch</h1>
+          </div>
+
+          <form id="resolver-form" class="resolver-form" autocomplete="off" novalidate>
+            <label class="sr-only" for="video-url">Video URL</label>
+            <div class="input-row">
+              <div class="url-field">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M10.6 13.4a2 2 0 0 0 2.8 0l3-3a2 2 0 0 0-2.8-2.8l-1 1M13.4 10.6a2 2 0 0 0-2.8 0l-3 3a2 2 0 1 0 2.8 2.8l1-1" />
+                </svg>
+                <input
+                  id="video-url"
+                  type="url"
+                  inputmode="url"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  spellcheck="false"
+                  data-lpignore="true"
+                  placeholder="Enter video URL"
+                  required
+                />
+              </div>
+
+              <button id="submit-button" type="submit">
+                <span class="button-label">Watch</span>
+                <span class="button-spinner" aria-hidden="true"></span>
+              </button>
+            </div>
+          </form>
+
+          <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+        </section>
+
+        <section id="result-section" class="result" aria-live="polite" hidden>
+          <div class="result-header">
+            <div class="result-title-group">
+              <span class="result-label">Result</span>
+              <h2 id="result-title">Video found</h2>
+            </div>
+            <span id="source-host" class="source-host">Media source</span>
+          </div>
+
+          <div class="player-frame">
+            <video id="video-player" controls playsinline preload="metadata"></video>
+            <div id="player-placeholder" class="player-placeholder">
+              <span aria-hidden="true">▶</span>
+              <p>Select a source to start playback.</p>
+            </div>
+          </div>
+
+          <div class="result-toolbar">
+            <div class="source-field">
+              <label for="source-select">Media source</label>
+              <select id="source-select" aria-label="Select a video source"></select>
+            </div>
+
+            <div class="result-actions">
+              <a
+                id="open-source"
+                class="secondary-button"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open source
+              </a>
+              <button id="copy-source" class="secondary-button" type="button">
+                Copy URL
+              </button>
+            </div>
+          </div>
+
+          <p class="result-note">
+            Temporary URLs may expire. Resolve the page link again to get a fresh source.
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.16/dist/hls.min.js" defer></script>
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js" defer></script>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
