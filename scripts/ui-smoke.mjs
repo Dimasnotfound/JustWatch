@@ -137,7 +137,8 @@ await new Promise((resolve) => setTimeout(resolve, 1200));
 const desktop = await evaluate(client, `(() => {
   const requiredIds = [
     "resolver-form", "video-url", "submit-button", "result-section",
-    "source-select", "video-player", "open-source", "copy-source"
+    "source-select", "video-player", "open-source", "copy-source",
+      "about-open", "about-dialog", "about-close"
   ];
   const faviconHref = document.querySelector('link[rel~="icon"]')?.href || "";
   const logoHref = document.querySelector(".title-logo")?.src || "";
@@ -152,7 +153,10 @@ const desktop = await evaluate(client, `(() => {
     resultInitiallyHidden: document.querySelector("#result-section")?.hidden === true,
     iconConsistent: Boolean(faviconHref && logoHref && faviconHref === logoHref),
     canonicalMatches: document.querySelector("link[rel='canonical']")?.href === ${JSON.stringify(canonicalUrl)},
-    seoContentVisible: Boolean(document.querySelector(".seo-content")?.getBoundingClientRect().height),
+    aboutTriggerVisible: Boolean(document.querySelector("#about-open")?.getBoundingClientRect().height),
+      aboutDialogClosed: document.querySelector("#about-dialog")?.open === false,
+      legacySeoSectionAbsent: document.querySelector(".seo-content") === null,
+      legacyFooterAbsent: document.querySelector(".site-footer") === null,
     formAutocomplete: document.querySelector("#resolver-form")?.autocomplete,
     inputAutocomplete: document.querySelector("#video-url")?.autocomplete,
     localStorageEntries: localStorage.length,
@@ -161,7 +165,23 @@ const desktop = await evaluate(client, `(() => {
 })()`);
 
 await evaluate(client, `(() => {
-  const input = document.querySelector("#video-url");
+  document.querySelector("#about-open").click();
+    return true;
+  })()`);
+  await waitFor(client, `(() => document.querySelector("#about-dialog").open)()`, 5_000);
+  const aboutDialogState = await evaluate(client, `(() => ({
+    opened: document.querySelector("#about-dialog").open,
+    contentVisible: Boolean(document.querySelector("#about-dialog .about-panel")?.getBoundingClientRect().height),
+    closeVisible: Boolean(document.querySelector("#about-close")?.getBoundingClientRect().height)
+  }))()`);
+  await evaluate(client, `(() => {
+    document.querySelector("#about-close").click();
+    return true;
+  })()`);
+  await waitFor(client, `(() => !document.querySelector("#about-dialog").open)()`, 5_000);
+
+  await evaluate(client, `(() => {
+    const input = document.querySelector("#video-url");
   input.value = ${JSON.stringify(sampleVideo)};
   document.querySelector("#resolver-form").dispatchEvent(
     new Event("submit", { bubbles: true, cancelable: true })
@@ -208,7 +228,9 @@ const mobile = await evaluate(client, `(() => ({
   horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
   formWidth: Math.round(document.querySelector("#resolver-form").getBoundingClientRect().width),
   submitWidth: Math.round(document.querySelector("#submit-button").getBoundingClientRect().width),
-  titleVisible: Boolean(document.querySelector("#page-title")?.getBoundingClientRect().height)
+  titleVisible: Boolean(document.querySelector("#page-title")?.getBoundingClientRect().height),
+    aboutTriggerVisible: Boolean(document.querySelector("#about-open")?.getBoundingClientRect().height),
+    aboutDialogClosed: document.querySelector("#about-dialog")?.open === false
 }))()`);
 if (saveScreenshots) await saveScreenshot(client, "ui-smoke-mobile.png");
 
@@ -216,6 +238,7 @@ client.close();
 
 const report = {
   desktop,
+  aboutDialogState,
   resultState,
   mobile,
   runtimeErrors,
@@ -232,7 +255,13 @@ if (
   !desktop.formVisible ||
   !desktop.iconConsistent ||
   !desktop.canonicalMatches ||
-  !desktop.seoContentVisible ||
+  !desktop.aboutTriggerVisible ||
+  !desktop.aboutDialogClosed ||
+  !desktop.legacySeoSectionAbsent ||
+  !desktop.legacyFooterAbsent ||
+  !aboutDialogState.opened ||
+  !aboutDialogState.contentVisible ||
+  !aboutDialogState.closeVisible ||
   desktop.formAutocomplete !== "off" ||
   desktop.inputAutocomplete !== "off" ||
   desktop.localStorageEntries !== 0 ||
@@ -241,6 +270,8 @@ if (
   resultState.inputValueAfterResolve !== "" ||
   mobile.horizontalOverflow ||
   !mobile.titleVisible ||
+  !mobile.aboutTriggerVisible ||
+  !mobile.aboutDialogClosed ||
   runtimeErrors.length ||
   logErrors.length
 ) {

@@ -11,6 +11,9 @@ const videoPlayer = document.querySelector("#video-player");
 const playerPlaceholder = document.querySelector("#player-placeholder");
 const openSource = document.querySelector("#open-source");
 const copySource = document.querySelector("#copy-source");
+const aboutOpen = document.querySelector("#about-open");
+const aboutDialog = document.querySelector("#about-dialog");
+const aboutClose = document.querySelector("#about-close");
 
 const defaultSubmitLabel = submitLabel.textContent;
 let currentSources = [];
@@ -359,6 +362,36 @@ copySource.addEventListener("click", async () => {
   }
 });
 
+function openAboutDialog() {
+  if (typeof aboutDialog.showModal === "function") {
+    aboutDialog.showModal();
+    return;
+  }
+  aboutDialog.setAttribute("open", "");
+}
+
+function closeAboutDialog() {
+  if (typeof aboutDialog.close === "function") {
+    aboutDialog.close();
+    return;
+  }
+  aboutDialog.removeAttribute("open");
+  aboutOpen.focus();
+}
+
+aboutOpen.addEventListener("click", openAboutDialog);
+aboutClose.addEventListener("click", closeAboutDialog);
+aboutDialog.addEventListener("click", (event) => {
+  const bounds = aboutDialog.getBoundingClientRect();
+  const isBackdropClick =
+    event.clientX < bounds.left ||
+    event.clientX > bounds.right ||
+    event.clientY < bounds.top ||
+    event.clientY > bounds.bottom;
+  if (isBackdropClick) closeAboutDialog();
+});
+aboutDialog.addEventListener("close", () => aboutOpen.focus());
+
 videoPlayer.addEventListener("error", () => {
   showMessage(
     "The source was found, but the media could not be played directly. Try another format or use Open source."
@@ -366,6 +399,7 @@ videoPlayer.addEventListener("error", () => {
 });
 
 function clearTransientSession() {
+  if (aboutDialog.open) aboutDialog.close();
   urlInput.value = "";
   currentSources = [];
   sourceSelect.replaceChildren();

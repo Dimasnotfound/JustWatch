@@ -59,6 +59,14 @@ test("README uses the custom domain and documents indexing endpoints", () => {
   assert.doesNotMatch(readme, new RegExp(OLD_DEPLOYMENT.replaceAll(".", "\\.")));
 });
 
+test("keeps the homepage minimal with an accessible About dialog", () => {
+  assert.match(indexHtml, /<dialog id="about-dialog"/);
+  assert.match(indexHtml, /id="about-open"/);
+  assert.match(indexHtml, /id="about-close"/);
+  assert.doesNotMatch(indexHtml, /class="seo-content"/);
+  assert.doesNotMatch(indexHtml, /class="site-footer"/);
+});
+
 test("Open Graph image is a 1200 by 630 PNG", () => {
   const image = readFileSync(new URL("../public/og-image.png", import.meta.url));
   assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);

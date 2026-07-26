@@ -204,80 +204,108 @@
           </p>
         </section>
 
-        <section class="seo-content" aria-labelledby="about-title">
-          <div class="seo-intro">
-            <span class="section-kicker">Public media resolver</span>
-            <h2 id="about-title">A clean online player for public video URLs.</h2>
-            <p>
-              Just Watch finds playable sources published by public media pages and opens them in
-              a focused browser player. Paste a link, press Watch, and choose an available MP4,
-              HLS, or MPEG-DASH source without navigating through source-page pop-ups.
-            </p>
+        <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title">
+          <div class="about-panel">
+            <button
+              id="about-close"
+              class="about-close"
+              type="button"
+              aria-label="Close About panel"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m7 7 10 10M17 7 7 17"></path>
+              </svg>
+            </button>
+
+            <div class="seo-intro">
+              <span class="section-kicker">Public media resolver</span>
+              <h2 id="about-title">A clean online player for public video URLs.</h2>
+              <p>
+                Just Watch finds playable sources published by public media pages and opens them in
+                a focused browser player. Paste a link, press Watch, and choose an available MP4,
+                HLS, or MPEG-DASH source without navigating through source-page pop-ups.
+              </p>
+            </div>
+
+            <div class="seo-grid">
+              <article>
+                <h3>Resolve public media</h3>
+                <p>
+                  The layered resolver checks direct media links, standard video metadata, supported
+                  site adapters, and a broad yt-dlp fallback when needed.
+                </p>
+              </article>
+              <article>
+                <h3>Play common formats</h3>
+                <p>
+                  Use Just Watch as an online MP4 player, HLS player, or DASH player when the source
+                  is public, unprotected, and compatible with browser playback.
+                </p>
+              </article>
+              <article>
+                <h3>Keep the flow simple</h3>
+                <p>
+                  The application does not store a local URL history or host the full video file.
+                  Playback is requested from the original media host or CDN.
+                </p>
+              </article>
+            </div>
+
+            <div class="faq" aria-labelledby="faq-title">
+              <span class="section-kicker">FAQ</span>
+              <h2 id="faq-title">Questions about Just Watch</h2>
+
+              <details>
+                <summary>Is Just Watch a video hosting service?</summary>
+                <p>
+                  No. Just Watch resolves source information and lets the browser request media from
+                  its original host. It does not upload or permanently store the video file.
+                </p>
+              </details>
+
+              <details>
+                <summary>Does Just Watch remove advertisements from videos?</summary>
+                <p>
+                  It avoids opening source-page pop-ups and does not inject advertisements. It does
+                  not remove ads already embedded inside a video or live stream.
+                </p>
+              </details>
+
+              <details>
+                <summary>Which links can Just Watch open?</summary>
+                <p>
+                  It is intended for public, unprotected URLs. DRM, login requirements, paywalls,
+                  private content, CAPTCHA, region locks, and source-specific restrictions are not
+                  bypassed.
+                </p>
+              </details>
+            </div>
+
+            <nav class="about-links" aria-label="About links">
+              <span>Just Watch by PrimaCodes.</span>
+              <a href="https://primacodes.com/" target="_blank" rel="noopener noreferrer">
+                PrimaCodes
+              </a>
+              <a href="/sitemap.xml">Sitemap</a>
+            </nav>
           </div>
-
-          <div class="seo-grid">
-            <article>
-              <h3>Resolve public media</h3>
-              <p>
-                The layered resolver checks direct media links, standard video metadata, supported
-                site adapters, and a broad yt-dlp fallback when needed.
-              </p>
-            </article>
-            <article>
-              <h3>Play common formats</h3>
-              <p>
-                Use Just Watch as an online MP4 player, HLS player, or DASH player when the source
-                is public, unprotected, and compatible with browser playback.
-              </p>
-            </article>
-            <article>
-              <h3>Keep the flow simple</h3>
-              <p>
-                The application does not store a local URL history or host the full video file.
-                Playback is requested from the original media host or CDN.
-              </p>
-            </article>
-          </div>
-
-          <div class="faq" aria-labelledby="faq-title">
-            <span class="section-kicker">FAQ</span>
-            <h2 id="faq-title">Questions about Just Watch</h2>
-
-            <details>
-              <summary>Is Just Watch a video hosting service?</summary>
-              <p>
-                No. Just Watch resolves source information and lets the browser request media from
-                its original host. It does not upload or permanently store the video file.
-              </p>
-            </details>
-
-            <details>
-              <summary>Does Just Watch remove advertisements from videos?</summary>
-              <p>
-                It avoids opening source-page pop-ups and does not inject advertisements. It does
-                not remove ads already embedded inside a video or live stream.
-              </p>
-            </details>
-
-            <details>
-              <summary>Which links can Just Watch open?</summary>
-              <p>
-                It is intended for public, unprotected URLs. DRM, login requirements, paywalls,
-                private content, CAPTCHA, region locks, and source-specific restrictions are not
-                bypassed.
-              </p>
-            </details>
-          </div>
-        </section>
+        </dialog>
       </main>
 
-      <footer class="site-footer">
-        <p>Just Watch by PrimaCodes.</p>
-        <nav aria-label="Footer links">
-          <a href="https://primacodes.com/">PrimaCodes</a>
-          <a href="/sitemap.xml">Sitemap</a>
-        </nav>
-      </footer>
+      <button
+        id="about-open"
+        class="about-trigger"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="about-dialog"
+        aria-label="About Just Watch"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 10.5v6"></path>
+          <circle cx="12" cy="7.5" r="0.8" class="about-dot"></circle>
+        </svg>
+      </button>
     </div>
 
     <noscript>
