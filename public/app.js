@@ -8,6 +8,7 @@ const resultTitle = document.querySelector("#result-title");
 const sourceHost = document.querySelector("#source-host");
 const sourceSelect = document.querySelector("#source-select");
 const videoPlayer = document.querySelector("#video-player");
+const embedPlayer = document.querySelector("#embed-player");
 const playerPlaceholder = document.querySelector("#player-placeholder");
 const openSource = document.querySelector("#open-source");
 const copySource = document.querySelector("#copy-source");
@@ -112,6 +113,9 @@ function destroyPlayer() {
   videoPlayer.removeAttribute("type");
   videoPlayer.load();
   videoPlayer.classList.remove("is-ready");
+
+  embedPlayer.removeAttribute("src");
+  embedPlayer.classList.remove("is-ready");
   playerPlaceholder.hidden = false;
 }
 
@@ -131,6 +135,7 @@ function describeSource(source, index) {
   const kindLabels = {
     hls: "HLS stream",
     dash: "MPEG-DASH",
+    embed: "Embedded player",
     audio: "Audio",
     file: source.mimeType || "Media file"
   };
@@ -162,7 +167,35 @@ function attachSource(source) {
   destroyPlayer();
   clearMessage();
 
-  openSource.href = source.url;
+  openSource.href = source.openUrl || source.url;
+
+  if (source.kind === "embed") {
+    let embedUrl;
+    try {
+      embedUrl = new URL(source.url);
+      const allowedHosts = new Set([
+        "youtube.com",
+        "www.youtube.com",
+        "youtube-nocookie.com",
+        "www.youtube-nocookie.com"
+      ]);
+      if (
+        !allowedHosts.has(embedUrl.hostname.toLowerCase()) ||
+        !/^\/embed\/[A-Za-z0-9_-]{11}$/.test(embedUrl.pathname)
+      ) {
+        throw new Error("Unsupported embed URL");
+      }
+      embedUrl.searchParams.set("origin", window.location.origin);
+    } catch {
+      showMessage("The embedded player URL is invalid.");
+      return;
+    }
+
+    embedPlayer.src = embedUrl.href;
+    embedPlayer.classList.add("is-ready");
+    playerPlaceholder.hidden = true;
+    return;
+  }
 
   if (source.kind === "hls") {
     if (videoPlayer.canPlayType("application/vnd.apple.mpegurl")) {
@@ -351,7 +384,7 @@ copySource.addEventListener("click", async () => {
   if (!source) return;
 
   try {
-    await navigator.clipboard.writeText(source.url);
+    await navigator.clipboard.writeText(source.openUrl || source.url);
     const originalLabel = copySource.textContent;
     copySource.textContent = "Copied";
     setTimeout(() => {

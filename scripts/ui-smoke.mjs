@@ -137,7 +137,7 @@ await new Promise((resolve) => setTimeout(resolve, 1200));
 const desktop = await evaluate(client, `(() => {
   const requiredIds = [
     "resolver-form", "video-url", "submit-button", "result-section",
-    "source-select", "video-player", "open-source", "copy-source",
+    "source-select", "video-player", "embed-player", "open-source", "copy-source",
       "about-open", "about-dialog", "about-close"
   ];
   const faviconHref = document.querySelector('link[rel~="icon"]')?.href || "";
@@ -196,7 +196,7 @@ await waitFor(
 );
 await waitFor(
   client,
-  `(() => document.querySelector("#video-player").classList.contains("is-ready") || !document.querySelector("#message").hidden)()`,
+  `(() => document.querySelector("#video-player").classList.contains("is-ready") || document.querySelector("#embed-player").classList.contains("is-ready") || !document.querySelector("#message").hidden)()`,
   15_000
 );
 
@@ -205,8 +205,10 @@ const resultState = await evaluate(client, `(() => ({
   message: document.querySelector("#message").hidden ? "" : document.querySelector("#message").textContent.trim(),
   resultTitle: document.querySelector("#result-title").textContent.trim(),
   selectedSource: document.querySelector("#source-select").selectedOptions[0]?.textContent || "",
-  playerReady: document.querySelector("#video-player").classList.contains("is-ready"),
+  playerReady: document.querySelector("#video-player").classList.contains("is-ready") || document.querySelector("#embed-player").classList.contains("is-ready"),
+  playerKind: document.querySelector("#embed-player").classList.contains("is-ready") ? "embed" : "video",
   sourceUrl: document.querySelector("#open-source").href,
+  embedUrl: document.querySelector("#embed-player").src || "",
   inputValueAfterResolve: document.querySelector("#video-url").value
 }))()`);
 if (saveScreenshots) await saveScreenshot(client, "ui-result-desktop.png");

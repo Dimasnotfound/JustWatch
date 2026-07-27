@@ -323,15 +323,24 @@ main {
   border-radius: 4px;
 }
 
-#video-player {
+#video-player,
+#embed-player {
   display: none;
   width: 100%;
   height: 100%;
   background: #000;
+}
+
+#video-player {
   object-fit: contain;
 }
 
-#video-player.is-ready {
+#embed-player {
+  border: 0;
+}
+
+#video-player.is-ready,
+#embed-player.is-ready {
   display: block;
 }
 

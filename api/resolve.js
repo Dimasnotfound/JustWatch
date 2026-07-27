@@ -83,6 +83,65 @@ function sourceKind(mimeType, urlValue) {
   return "file";
 }
 
+function parseYouTubeStart(value) {
+  if (!value) return 0;
+  const text = String(value).trim().toLowerCase();
+  if (/^\d+$/.test(text)) return Number(text);
+
+  const match = text.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+  if (!match) return 0;
+  return (Number(match[1] || 0) * 3600) + (Number(match[2] || 0) * 60) + Number(match[3] || 0);
+}
+
+export function extractYouTubeEmbedSource(inputUrl) {
+  let parsed;
+  try {
+    parsed = new URL(inputUrl);
+  } catch {
+    return null;
+  }
+
+  const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  let videoId = "";
+
+  if (hostname === "youtu.be") {
+    videoId = parsed.pathname.split("/").filter(Boolean)[0] || "";
+  } else if (["youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"].includes(hostname)) {
+    const pathname = parsed.pathname.replace(/\/+$/, "") || "/";
+    const segments = pathname.split("/").filter(Boolean);
+    if (pathname === "/watch") {
+      videoId = parsed.searchParams.get("v") || "";
+    } else if (["shorts", "embed", "live"].includes(segments[0])) {
+      videoId = segments[1] || "";
+    }
+  }
+
+  if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return null;
+
+  const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const embedUrl = new URL(`https://www.youtube.com/embed/${videoId}`);
+  embedUrl.searchParams.set("playsinline", "1");
+  embedUrl.searchParams.set("rel", "0");
+
+  const start = parseYouTubeStart(parsed.searchParams.get("start") || parsed.searchParams.get("t"));
+  if (Number.isSafeInteger(start) && start > 0) embedUrl.searchParams.set("start", String(start));
+
+  return {
+    videoId,
+    canonicalUrl,
+    source: {
+      url: embedUrl.href,
+      openUrl: canonicalUrl,
+      mimeType: "text/html",
+      kind: "embed",
+      origin: "youtube-iframe",
+      label: "YouTube player",
+      hasVideo: true,
+      hasAudio: true
+    }
+  };
+}
+
 function isVidSonicHost(urlValue) {
   try {
     const hostname = new URL(urlValue).hostname.toLowerCase();
@@ -962,6 +1021,19 @@ function pageMetadata(html, fallbackUrl) {
 
 export async function resolveMedia(inputUrl) {
   const parsed = await validatePublicUrl(inputUrl);
+  const youtube = extractYouTubeEmbedSource(parsed.href);
+  if (youtube) {
+    return {
+      title: "YouTube video",
+      pageUrl: parsed.href,
+      finalUrl: youtube.canonicalUrl,
+      sourceHost: "www.youtube.com",
+      provider: "youtube-embed",
+      id: youtube.videoId,
+      sources: [youtube.source]
+    };
+  }
+
   const { response, finalUrl } = await safeFetch(parsed.href);
   const contentType = response.headers.get("content-type") || "";
   const mimeType = directMediaType(contentType, finalUrl);

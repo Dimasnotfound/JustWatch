@@ -171,6 +171,13 @@
 
           <div class="player-frame">
             <video id="video-player" controls playsinline preload="metadata"></video>
+            <iframe
+              id="embed-player"
+              title="Embedded video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen
+            ></iframe>
             <div id="player-placeholder" class="player-placeholder">
               <span aria-hidden="true">▶</span>
               <p>Select a source to start playback.</p>

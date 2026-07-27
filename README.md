@@ -75,6 +75,7 @@ The resolver uses a layered approach:
 - **Direct playback** from the original host instead of storing video files.
 - **HLS support** through `hls.js`.
 - **MPEG-DASH support** through `dash.js`.
+- **Official YouTube iframe playback** for public YouTube watch, short, live, embed, and `youtu.be` URLs.
 - **Generic dynamic-player adapter** for public same-origin JSON stream APIs.
 - **First-party player-script inspection** for common JW Player, Video.js, Clappr, direct CDN, and retrieval-URL patterns.
 - **Public share-link adapters** for patterns such as Videy CDN links and Dood-style `pass_md5` players when the page is directly accessible.
@@ -123,6 +124,7 @@ The application does not proxy the full video through Vercel. The API returns so
 
 ### Extended providers
 
+- Public YouTube URLs through the official embedded player rather than temporary `googlevideo.com` extraction URLs
 - Public player pages that expose a same-origin stream, media, source, video, player, manifest, or file API in their JavaScript
 - Same-origin first-party bundles containing common player configuration or retrieval URLs
 - Common JSON response fields such as `streaming_url`, `manifest_url`, `playlist`, `sources`, `file`, and `src`
