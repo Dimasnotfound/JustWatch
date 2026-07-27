@@ -59,9 +59,10 @@ The resolver uses a layered approach:
 
 1. Check whether the submitted URL is already a direct media source.
 2. Inspect standard HTML video metadata and structured data.
-3. Run supported site-specific adapters.
-4. Fall back to `yt-dlp` for broader website coverage.
-5. Play the selected source directly from the original media host or CDN.
+3. Detect constrained same-origin stream APIs exposed by public player JavaScript.
+4. Run supported site-specific adapters.
+5. Fall back to `yt-dlp` for broader website coverage.
+6. Play the selected source directly from the original media host or CDN.
 
 > **About “No pop-ups”**
 >
@@ -74,6 +75,9 @@ The resolver uses a layered approach:
 - **Direct playback** from the original host instead of storing video files.
 - **HLS support** through `hls.js`.
 - **MPEG-DASH support** through `dash.js`.
+- **Generic dynamic-player adapter** for public same-origin JSON stream APIs.
+- **First-party player-script inspection** for common JW Player, Video.js, Clappr, direct CDN, and retrieval-URL patterns.
+- **Public share-link adapters** for patterns such as Videy CDN links and Dood-style `pass_md5` players when the page is directly accessible.
 - **VidSonic adapter** for public signed HLS manifests exposed to the browser.
 - **yt-dlp fallback** for many public and unprotected media websites.
 - **Optional self-hosted Cobalt provider** for supported social-media workflows.
@@ -85,14 +89,16 @@ The resolver uses a layered approach:
 
 ```mermaid
 flowchart LR
-    A[Paste a public media URL] --> B[Fast resolver]
+    A[Paste a public media URL] --> B[Direct and HTML discovery]
     B --> C{Playable source found?}
-    C -->|Yes| F[Return media sources]
-    C -->|No| D[Site adapter]
-    D --> E[yt-dlp fallback]
-    E --> F
-    F --> G[Browser player]
-    G --> H[Original CDN or media host]
+    C -->|Yes| G[Return media sources]
+    C -->|No| D[Safe same-origin player API discovery]
+    D --> E{Playable source found?}
+    E -->|Yes| G
+    E -->|No| F[Site adapter and yt-dlp fallback]
+    F --> G
+    G --> H[Browser player]
+    H --> I[Original CDN or media host]
 ```
 
 The application does not proxy the full video through Vercel. The API returns source metadata and playable URLs, while the browser requests the media from its original location.
@@ -117,11 +123,19 @@ The application does not proxy the full video through Vercel. The API returns so
 
 ### Extended providers
 
+- Public player pages that expose a same-origin stream, media, source, video, player, manifest, or file API in their JavaScript
+- Same-origin first-party bundles containing common player configuration or retrieval URLs
+- Common JSON response fields such as `streaming_url`, `manifest_url`, `playlist`, `sources`, `file`, and `src`
+- Vidara-style and similar `/api/stream` player flows
+- Videy public share links backed by `cdn.videy.co`
+- Dood-style `pass_md5` player flows when their public page is available without a browser challenge
 - VidSonic public signed manifests
 - Websites supported by the installed `yt-dlp` release
 - Optional self-hosted Cobalt instance
 
-Support depends on the source website, its current extractor compatibility, access policy, CORS configuration, token rules, and anti-bot protections.
+Dynamic API discovery does not execute arbitrary page JavaScript. It only follows a small number of same-origin retrieval endpoints, derives non-sensitive public identifiers from the submitted URL, and validates every returned media URL. Hostnames are not treated as universal guarantees because player implementations change frequently.
+
+Cloudflare challenges, CAPTCHA, login gates, DRM, private content, and source URLs that require browser-only headers or unsupported CORS policies are not bypassed. Some hosts may therefore be detected but still refuse direct browser playback.
 
 ## Architecture
 
@@ -137,7 +151,7 @@ public/
   site.webmanifest    Installable web application metadata
 
 api/
-  resolve.js          Fast Node.js resolver and site adapters
+  resolve.js          Fast Node.js resolver and safe dynamic player adapters
   universal.py        Python resolver powered by yt-dlp and optional Cobalt
 
 scripts/
@@ -182,7 +196,10 @@ The resolver includes protections intended to reduce misuse and server-side requ
 - Localhost, private IP ranges, and reserved addresses are blocked.
 - DNS results and redirects are validated before use.
 - Redirect depth, request size, response size, playlist entries, and processing time are limited.
+- Dynamic player API calls are restricted to the source page's exact origin and retrieval-oriented endpoint paths.
+- A public anonymous session cookie set by the submitted page may be reused only for that same-origin API request and is never returned to the browser.
 - Browser cookies and account credentials are not imported.
+- Fields associated with authentication, signatures, CAPTCHA, DRM, licenses, passwords, or secrets are not synthesized.
 - Geo-bypass and DRM circumvention are not implemented.
 - Sensitive request headers are not returned to the client.
 
