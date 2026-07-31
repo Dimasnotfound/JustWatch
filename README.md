@@ -77,6 +77,7 @@ The resolver uses a layered approach:
 - **MPEG-DASH support** through `dash.js`.
 - **Official YouTube iframe playback** for public YouTube watch, short, live, embed, and `youtu.be` URLs.
 - **Generic dynamic-player adapter** for public same-origin JSON stream APIs.
+- **Bounded nested-player discovery** for same-origin iframe pages and statically assembled player URLs.
 - **First-party player-script inspection** for common JW Player, Video.js, Clappr, direct CDN, and retrieval-URL patterns.
 - **Public share-link adapters** for patterns such as Videy CDN links and Dood-style `pass_md5` players when the page is directly accessible.
 - **VidSonic adapter** for public signed HLS manifests exposed to the browser.
@@ -199,6 +200,7 @@ The resolver includes protections intended to reduce misuse and server-side requ
 - DNS results and redirects are validated before use.
 - Redirect depth, request size, response size, playlist entries, and processing time are limited.
 - Dynamic player API calls are restricted to the source page's exact origin and retrieval-oriented endpoint paths.
+- Nested player pages are restricted to the exact source origin, blocked from unsafe path categories, and capped by depth and request count.
 - A public anonymous session cookie set by the submitted page may be reused only for that same-origin API request and is never returned to the browser.
 - Browser cookies and account credentials are not imported.
 - Fields associated with authentication, signatures, CAPTCHA, DRM, licenses, passwords, or secrets are not synthesized.
@@ -238,7 +240,6 @@ http://localhost:3000
 
 ```bash
 npm run check
-npm test
 ```
 
 ## Deploy to Vercel

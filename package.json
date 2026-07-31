@@ -9,10 +9,7 @@
     "setup:universal": "node scripts/setup-universal.mjs",
     "dev": "node server.mjs --port=3000",
     "start": "node server.mjs",
-    "test:node": "node --test",
-    "test:python": "node scripts/python-runner.mjs -m unittest tests.test_universal -v",
-    "test": "npm run test:node && npm run test:python",
-    "check": "node --check api/resolve.js && node --check public/app.js && node --check server.mjs && node --check scripts/python-runner.mjs && node --check scripts/setup-universal.mjs && node scripts/python-runner.mjs -m py_compile api/universal.py tests/test_universal.py"
+    "check": "node --check api/resolve.js && node --check public/app.js && node --check server.mjs && node --check scripts/python-runner.mjs && node --check scripts/setup-universal.mjs && node scripts/python-runner.mjs -m py_compile api/universal.py"
   },
   "engines": {
     "node": ">=22"

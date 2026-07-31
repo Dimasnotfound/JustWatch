@@ -10,6 +10,9 @@ const MAX_SCRIPT_TOTAL_BYTES = 1_500_000;
 const MAX_SAME_ORIGIN_SCRIPTS = 4;
 const MAX_DYNAMIC_API_ENDPOINTS = 4;
 const MAX_DYNAMIC_API_REQUESTS = 6;
+const MAX_NESTED_PLAYER_DEPTH = 3;
+const MAX_NESTED_PLAYER_PAGES = 5;
+const MAX_NESTED_PLAYER_URLS = 4;
 const REQUEST_TIMEOUT_MS = 12_000;
 const ALLOWED_PORTS = new Set(["", "80", "443"]);
 const DYNAMIC_API_PATH_PATTERN = /(?:^|[\/_-])(?:stream(?:ing)?|sources?|playback|manifest|playlist|get[-_]?(?:media|video|file)|load[-_]?(?:media|video|file)|fetch[-_]?(?:media|video|file)|(?:media|video|file)[-_]?(?:info|source|stream|url)|player[\/_-]?(?:config|source|stream))(?:[\/_.-]|$)/i;
@@ -59,6 +62,130 @@ function normalizeCandidate(value, baseUrl) {
   } catch {
     return null;
   }
+}
+
+function decodeJavaScriptString(value) {
+  return String(value || "")
+    .replace(/\\u\{([0-9a-f]{1,6})\}/gi, (_match, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/\\u([0-9a-f]{4})/gi, (_match, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/\\x([0-9a-f]{2})/gi, (_match, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/\\([\\/'"`])/g, "$1")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t");
+}
+
+function evaluateStaticStringExpression(expression, variables) {
+  const text = String(expression || "").trim();
+  if (!text || text.length > 16_384) return "";
+
+  let index = 0;
+  let result = "";
+  let parts = 0;
+
+  const skipWhitespace = () => {
+    while (index < text.length && /\s/.test(text[index])) index += 1;
+  };
+
+  while (index < text.length) {
+    skipWhitespace();
+    if (index >= text.length) break;
+
+    const quote = text[index];
+    if (quote === "'" || quote === '"' || quote === "`") {
+      index += 1;
+      let raw = "";
+      let closed = false;
+
+      while (index < text.length) {
+        const character = text[index];
+        if (character === "\\" && index + 1 < text.length) {
+          raw += character + text[index + 1];
+          index += 2;
+          continue;
+        }
+        if (character === quote) {
+          closed = true;
+          index += 1;
+          break;
+        }
+        raw += character;
+        index += 1;
+      }
+
+      if (!closed || raw.includes("${")) return "";
+      result += decodeJavaScriptString(raw);
+    } else {
+      const identifier = text.slice(index).match(/^[A-Za-z_$][\w$]*/)?.[0];
+      if (!identifier || !variables.has(identifier)) return "";
+      result += variables.get(identifier);
+      index += identifier.length;
+    }
+
+    parts += 1;
+    if (parts > 12 || result.length > 12_000) return "";
+
+    skipWhitespace();
+    if (index >= text.length) break;
+    if (text[index] !== "+") return "";
+    index += 1;
+  }
+
+  return result;
+}
+
+export function extractNestedPlayerUrls(html, baseUrl) {
+  let page;
+  try {
+    page = new URL(baseUrl);
+  } catch {
+    return [];
+  }
+
+  const variables = new Map();
+  const variablePattern = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(["'`])((?:\\.|(?!\2)[\s\S]){0,8192}?)\2\s*;/g;
+  for (const match of html.matchAll(variablePattern)) {
+    const value = decodeJavaScriptString(match[3]);
+    if (value && !value.includes("${") && value.length <= 8192) variables.set(match[1], value);
+    if (variables.size >= 64) break;
+  }
+
+  const urls = [];
+  const add = (rawValue) => {
+    const normalized = normalizeCandidate(rawValue, baseUrl);
+    if (!normalized) return;
+
+    const candidate = new URL(normalized);
+    if (candidate.origin !== page.origin || candidate.href === page.href) return;
+    if (candidate.search.length > 10_000) return;
+    if (BLOCKED_DYNAMIC_API_PATH_PATTERN.test(candidate.pathname)) return;
+    if (/\.(?:css|m?js|json|png|jpe?g|webp|gif|svg|ico|woff2?|ttf|map)(?:$|[?#])/i.test(candidate.pathname)) return;
+    if (!urls.includes(candidate.href)) urls.push(candidate.href);
+  };
+
+  for (const match of html.matchAll(/<iframe\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)) {
+    add(match[1]);
+    if (urls.length >= MAX_NESTED_PLAYER_URLS) return urls;
+  }
+
+  const sourceAssignments = [
+    /(?:[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\.src\s*=\s*([^;\n]{1,16384})\s*;/g,
+    /\.setAttribute\s*\(\s*["']src["']\s*,\s*([^\)\n]{1,16384})\)/g
+  ];
+  for (const pattern of sourceAssignments) {
+    for (const match of html.matchAll(pattern)) {
+      add(evaluateStaticStringExpression(match[1], variables));
+      if (urls.length >= MAX_NESTED_PLAYER_URLS) return urls;
+    }
+  }
+
+  for (const [name, value] of variables) {
+    if (!/(?:iframe|embed|player).*(?:url|src|path)|(?:url|src|path).*(?:iframe|embed|player)|playerpath/i.test(name)) continue;
+    add(value);
+    if (urls.length >= MAX_NESTED_PLAYER_URLS) break;
+  }
+
+  return urls;
 }
 
 function guessMime(urlValue, declaredType = "") {
@@ -388,20 +515,21 @@ function firstMatch(html, patterns) {
 
 export function extractMediaCandidates(html, baseUrl) {
   const candidates = [];
-  const add = (rawUrl, declaredType = "", origin = "page") => {
+  const add = (rawUrl, declaredType = "", origin = "page", allowProbe = false) => {
     const url = normalizeCandidate(rawUrl, baseUrl);
     if (!url) return;
 
     const mimeType = guessMime(url, declaredType);
     const kind = sourceKind(mimeType, url);
-    if (!mimeType && kind === "file") return;
+    if (!mimeType && kind === "file" && !allowProbe) return;
 
     if (!candidates.some((item) => item.url === url)) {
       candidates.push({
         url,
         mimeType,
         kind,
-        origin
+        origin,
+        ...(!mimeType ? { needsProbe: true } : {})
       });
     }
   };
@@ -414,18 +542,18 @@ export function extractMediaCandidates(html, baseUrl) {
   ];
 
   for (const pattern of metaPatterns) {
-    for (const match of html.matchAll(pattern)) add(match[1], "", "metadata");
+    for (const match of html.matchAll(pattern)) add(match[1], "", "metadata", true);
   }
 
   for (const match of html.matchAll(/<(?:video|source)\b([^>]*)>/gi)) {
     const attributes = match[1];
     const src = attributes.match(/\bsrc=["']([^"']+)["']/i)?.[1];
     const type = attributes.match(/\btype=["']([^"']+)["']/i)?.[1] || "";
-    add(src, type, "html5");
+    add(src, type, "html5", true);
   }
 
   for (const match of html.matchAll(/["']contentUrl["']\s*:\s*["']([^"']+)["']/gi)) {
-    add(match[1].replaceAll("\\/", "/"), "", "structured-data");
+    add(match[1].replaceAll("\\/", "/"), "", "structured-data", true);
   }
 
   return candidates;
@@ -471,6 +599,7 @@ export function extractScriptMediaCandidates(scriptText, baseUrl) {
       return;
     }
     if (/(?:thumbnail|poster|image|avatar|subtitle|caption|advert|vast|logo|preview)/i.test(pathname)) return;
+    if (/(?:^|\/)(?:blank|empty|placeholder|silence)(?:[-_.]|$)/i.test(pathname)) return;
 
     const mimeType = guessMime(url, declaredType);
     const retrievalPath = DYNAMIC_API_PATH_PATTERN.test(pathname);
@@ -898,6 +1027,10 @@ async function finalizeDynamicSources(candidates, pageUrl, sessionCookie) {
         };
       }
 
+      source.httpHeaders = {
+        ...(source.httpHeaders || {}),
+        Referer: pageUrl
+      };
       delete source.needsProbe;
       if (!sources.some((item) => item.url === source.url)) sources.push(source);
     } catch {
@@ -971,6 +1104,120 @@ async function resolveDynamicApiSources(html, finalUrl, responseHeaders) {
       };
     } catch {
       // Try the next safely detected same-origin endpoint.
+    }
+  }
+
+  return null;
+}
+
+function mergeSessionCookies(...values) {
+  const pairs = new Map();
+  for (const value of values) {
+    for (const pair of String(value || "").split(";")) {
+      const trimmed = pair.trim();
+      const separator = trimmed.indexOf("=");
+      if (separator <= 0) continue;
+      const name = trimmed.slice(0, separator).trim();
+      if (!/^[^=;\s]+$/.test(name)) continue;
+      pairs.set(name, trimmed);
+    }
+  }
+
+  const cookie = [...pairs.values()].slice(0, 8).join("; ");
+  return cookie.length <= 4096 ? cookie : "";
+}
+
+async function resolveNestedPlayerPages(html, finalUrl, responseHeaders) {
+  const rootPage = new URL(finalUrl);
+  const initialCookie = extractSessionCookie(responseHeaders);
+  const visited = new Set([rootPage.href]);
+  const queue = extractNestedPlayerUrls(html, rootPage.href).map((url) => ({
+    url,
+    parentUrl: rootPage.href,
+    depth: 1,
+    sessionCookie: initialCookie
+  }));
+
+  let fetchedPages = 0;
+  while (queue.length && fetchedPages < MAX_NESTED_PLAYER_PAGES) {
+    const current = queue.shift();
+    if (!current || current.depth > MAX_NESTED_PLAYER_DEPTH || visited.has(current.url)) continue;
+    visited.add(current.url);
+    fetchedPages += 1;
+
+    try {
+      const headers = {
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
+        Referer: current.parentUrl
+      };
+      if (current.sessionCookie) headers.Cookie = current.sessionCookie;
+
+      const fetched = await safeFetch(current.url, {
+        headers,
+        range: false,
+        allowedOrigin: rootPage.origin,
+        maxRedirects: 2
+      });
+      const contentType = (fetched.response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) continue;
+
+      const nestedHtml = await readTextWithLimit(fetched.response);
+      const sessionCookie = mergeSessionCookies(
+        current.sessionCookie,
+        extractSessionCookie(fetched.response.headers)
+      );
+      const firstPartyScripts = await loadSameOriginScripts(nestedHtml, fetched.finalUrl, sessionCookie);
+      const playerText = `${nestedHtml}\n${firstPartyScripts}`;
+      const extracted = [
+        ...extractVidSonicCandidates(playerText, fetched.finalUrl),
+        ...extractMediaCandidates(nestedHtml, fetched.finalUrl),
+        ...extractScriptMediaCandidates(playerText, fetched.finalUrl),
+        ...extractVideyCandidates(fetched.finalUrl, firstPartyScripts)
+      ].filter((source, index, items) => items.findIndex((item) => item.url === source.url) === index);
+
+      let sources = await finalizeDynamicSources(extracted, fetched.finalUrl, sessionCookie);
+      let nestedResult = null;
+
+      if (!sources.length) {
+        nestedResult = await resolveDynamicApiSources(playerText, fetched.finalUrl, fetched.response.headers);
+        if (nestedResult?.sources?.length) sources = nestedResult.sources;
+      }
+
+      if (!sources.length) {
+        nestedResult = await resolveDoodStyleSource(playerText, fetched.finalUrl, fetched.response.headers);
+        if (nestedResult?.sources?.length) sources = nestedResult.sources;
+      }
+
+      if (sources.length) {
+        const metadata = pageMetadata(nestedHtml, fetched.finalUrl);
+        return {
+          sources: sources.map((source) => ({
+            ...source,
+            openUrl: fetched.finalUrl
+          })),
+          title: nestedResult?.title || metadata.title,
+          thumbnail: nestedResult?.thumbnail,
+          sourceHost: metadata.sourceHost,
+          provider: nestedResult?.provider || "nested-player-page",
+          warnings: [
+            "Sumber ditemukan melalui halaman player bertingkat. Jika pemutaran langsung ditolak oleh host, gunakan Open source."
+          ]
+        };
+      }
+
+      if (current.depth >= MAX_NESTED_PLAYER_DEPTH) continue;
+      for (const nestedUrl of extractNestedPlayerUrls(playerText, fetched.finalUrl)) {
+        if (visited.has(nestedUrl)) continue;
+        queue.push({
+          url: nestedUrl,
+          parentUrl: fetched.finalUrl,
+          depth: current.depth + 1,
+          sessionCookie
+        });
+        if (queue.length >= MAX_NESTED_PLAYER_PAGES) break;
+      }
+    } catch {
+      // Ignore nested pages that are unavailable, unsafe, or no longer valid.
     }
   }
 
@@ -1082,6 +1329,11 @@ export async function resolveMedia(inputUrl) {
   }
 
   if (!sources.length) {
+    dynamicResult = await resolveNestedPlayerPages(playerText, finalUrl, response.headers);
+    if (dynamicResult?.sources?.length) sources.push(...dynamicResult.sources);
+  }
+
+  if (!sources.length) {
     throw new Error("Sumber video publik tidak ditemukan pada halaman tersebut.");
   }
 
@@ -1090,7 +1342,9 @@ export async function resolveMedia(inputUrl) {
     ...metadata,
     ...(dynamicResult?.title ? { title: dynamicResult.title } : {}),
     ...(dynamicResult?.thumbnail ? { thumbnail: dynamicResult.thumbnail } : {}),
+    ...(dynamicResult?.sourceHost ? { sourceHost: dynamicResult.sourceHost } : {}),
     ...(dynamicResult?.provider ? { provider: dynamicResult.provider } : {}),
+    ...(dynamicResult?.warnings?.length ? { warnings: dynamicResult.warnings } : {}),
     pageUrl: parsed.href,
     finalUrl,
     sources

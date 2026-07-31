@@ -55,6 +55,7 @@ const SERVER_MESSAGE_TRANSLATIONS = new Map([
   ["Sebagian URL bersifat sementara dan perlu diproses ulang setelah kedaluwarsa.", "Some URLs are temporary and must be resolved again after they expire."],
   ["Sumber Cobalt dapat berupa tunnel sementara dan perlu diproses ulang setelah kedaluwarsa.", "A Cobalt source may use a temporary tunnel and must be resolved again after it expires."],
   ["Posting ini memiliki beberapa video. Pilih sumber dari daftar.", "This post contains multiple videos. Select a source from the list."],
+  ["Sumber ditemukan melalui halaman player bertingkat. Jika pemutaran langsung ditolak oleh host, gunakan Open source.", "The source was found through nested player pages. If the host rejects direct playback, use Open source."],
   ["Resolver universal mengalami kesalahan internal.", "The universal resolver encountered an internal error."],
   ["Body permintaan terlalu besar atau kosong.", "The request body is empty or too large."],
   ["Body permintaan terlalu besar.", "The request body is too large."],

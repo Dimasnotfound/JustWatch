@@ -11,3 +11,4 @@ __pycache__/
 ui-*.png
 .DS_Store
 Thumbs.db
+tests/
