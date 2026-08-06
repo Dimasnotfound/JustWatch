@@ -130,6 +130,7 @@ main {
 .input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: end;
   gap: 14px;
 }
 
@@ -152,7 +153,7 @@ main {
   pointer-events: none;
 }
 
-.url-field input,
+.url-field textarea,
 #submit-button,
 .source-field select,
 .secondary-button {
@@ -162,27 +163,43 @@ main {
   outline: none;
 }
 
-.url-field input {
+.url-field textarea {
   width: 100%;
-  padding: 0 18px 0 50px;
+  min-height: 132px;
+  padding: 17px 18px 17px 50px;
+  resize: vertical;
   color: var(--text);
   background: transparent;
   font-family: var(--mono);
   font-size: 14px;
+  line-height: 1.65;
   transition: border-color 150ms ease, background-color 150ms ease;
 }
 
-.url-field input::placeholder {
+.url-field-multiple svg {
+  top: 21px;
+  transform: none;
+}
+
+.url-field textarea::placeholder {
   color: #667078;
 }
 
-.url-field input:hover {
+.url-field textarea:hover {
   border-color: #4c565f;
 }
 
-.url-field input:focus {
+.url-field textarea:focus {
   border-color: var(--accent);
   background: rgba(255, 255, 255, 0.012);
+}
+
+.resolver-help {
+  margin: 10px 0 0;
+  color: #68737b;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.6;
 }
 
 #submit-button {
@@ -312,6 +329,10 @@ main {
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.media-switcher {
+  margin-bottom: 14px;
 }
 
 .player-frame {

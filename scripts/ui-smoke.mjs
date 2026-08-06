@@ -137,8 +137,9 @@ await new Promise((resolve) => setTimeout(resolve, 1200));
 const desktop = await evaluate(client, `(() => {
   const requiredIds = [
     "resolver-form", "video-url", "submit-button", "result-section",
-    "source-select", "video-player", "embed-player", "open-source", "copy-source",
-      "about-open", "about-dialog", "about-close"
+    "media-switcher", "media-select", "source-select", "video-player", "embed-player",
+    "open-source", "copy-source",
+    "about-open", "about-dialog", "about-close"
   ];
   const faviconHref = document.querySelector('link[rel~="icon"]')?.href || "";
   const logoHref = document.querySelector(".title-logo")?.src || "";
@@ -150,6 +151,9 @@ const desktop = await evaluate(client, `(() => {
     horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
     resolverVisible: Boolean(document.querySelector(".resolver")?.getBoundingClientRect().height),
     formVisible: Boolean(document.querySelector("#resolver-form")?.getBoundingClientRect().height),
+    inputTagName: document.querySelector("#video-url")?.tagName,
+    inputHeight: Math.round(document.querySelector("#video-url")?.getBoundingClientRect().height || 0),
+    helperVisible: Boolean(document.querySelector("#resolver-help")?.getBoundingClientRect().height),
     resultInitiallyHidden: document.querySelector("#result-section")?.hidden === true,
     iconConsistent: Boolean(faviconHref && logoHref && faviconHref === logoHref),
     canonicalMatches: document.querySelector("link[rel='canonical']")?.href === ${JSON.stringify(canonicalUrl)},
@@ -204,6 +208,7 @@ const resultState = await evaluate(client, `(() => ({
   resultVisible: !document.querySelector("#result-section").hidden,
   message: document.querySelector("#message").hidden ? "" : document.querySelector("#message").textContent.trim(),
   resultTitle: document.querySelector("#result-title").textContent.trim(),
+    mediaSwitcherHidden: document.querySelector("#media-switcher").hidden,
   selectedSource: document.querySelector("#source-select").selectedOptions[0]?.textContent || "",
   playerReady: document.querySelector("#video-player").classList.contains("is-ready") || document.querySelector("#embed-player").classList.contains("is-ready"),
   playerKind: document.querySelector("#embed-player").classList.contains("is-ready") ? "embed" : "video",
@@ -255,6 +260,9 @@ if (
   desktop.horizontalOverflow ||
   !desktop.resolverVisible ||
   !desktop.formVisible ||
+    desktop.inputTagName !== "TEXTAREA" ||
+    desktop.inputHeight < 120 ||
+    !desktop.helperVisible ||
   !desktop.iconConsistent ||
   !desktop.canonicalMatches ||
   !desktop.aboutTriggerVisible ||
@@ -269,6 +277,8 @@ if (
   desktop.localStorageEntries !== 0 ||
   desktop.sessionStorageEntries !== 0 ||
   !resultState.resultVisible ||
+  !resultState.mediaSwitcherHidden ||
+  !resultState.playerReady ||
   resultState.inputValueAfterResolve !== "" ||
   mobile.horizontalOverflow ||
   !mobile.titleVisible ||

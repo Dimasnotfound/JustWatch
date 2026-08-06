@@ -6,18 +6,26 @@ const message = document.querySelector("#message");
 const resultSection = document.querySelector("#result-section");
 const resultTitle = document.querySelector("#result-title");
 const sourceHost = document.querySelector("#source-host");
+const mediaSwitcher = document.querySelector("#media-switcher");
+const mediaSelect = document.querySelector("#media-select");
 const sourceSelect = document.querySelector("#source-select");
 const videoPlayer = document.querySelector("#video-player");
 const embedPlayer = document.querySelector("#embed-player");
 const playerPlaceholder = document.querySelector("#player-placeholder");
+const playerPlaceholderText = playerPlaceholder.querySelector("p");
 const openSource = document.querySelector("#open-source");
 const copySource = document.querySelector("#copy-source");
 const aboutOpen = document.querySelector("#about-open");
 const aboutDialog = document.querySelector("#about-dialog");
 const aboutClose = document.querySelector("#about-close");
 
+const MAX_BATCH_URLS = 10;
 const defaultSubmitLabel = submitLabel.textContent;
+let currentResults = [];
 let currentSources = [];
+let activeSourceIndex = -1;
+let failedSourceIndexes = new Set();
+let playbackFailureHandled = false;
 let hlsInstance = null;
 let dashInstance = null;
 
@@ -99,6 +107,48 @@ function clearMessage() {
   message.className = "message";
 }
 
+function parseInputUrls(value) {
+  const tokens = String(value || "")
+    .split(/[\s,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const urls = [];
+  const invalid = [];
+
+  for (const token of tokens) {
+    try {
+      const parsed = new URL(token);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        invalid.push(token);
+        continue;
+      }
+      if (!urls.includes(parsed.href)) urls.push(parsed.href);
+    } catch {
+      invalid.push(token);
+    }
+  }
+
+  return { urls, invalid };
+}
+
+function sourceActionUrl(source) {
+  if (!source || typeof source.url !== "string") return "";
+  if (source.kind === "embed" && typeof source.openUrl === "string") return source.openUrl;
+  return source.url;
+}
+
+function updateSourceActions(source) {
+  const actionUrl = sourceActionUrl(source);
+  if (actionUrl) {
+    openSource.href = actionUrl;
+    openSource.removeAttribute("aria-disabled");
+  } else {
+    openSource.removeAttribute("href");
+    openSource.setAttribute("aria-disabled", "true");
+  }
+}
+
 function destroyPlayer() {
   if (hlsInstance) {
     hlsInstance.destroy();
@@ -117,6 +167,7 @@ function destroyPlayer() {
 
   embedPlayer.removeAttribute("src");
   embedPlayer.classList.remove("is-ready");
+  playerPlaceholderText.textContent = "Select a source to start playback.";
   playerPlaceholder.hidden = false;
 }
 
@@ -164,11 +215,50 @@ function markPlayerReady() {
   playerPlaceholder.hidden = true;
 }
 
-function attachSource(source) {
-  destroyPlayer();
-  clearMessage();
+function findFallbackSourceIndex() {
+  return currentSources.findIndex((source, index) => (
+    index !== activeSourceIndex &&
+    !failedSourceIndexes.has(index) &&
+    source &&
+    typeof source.url === "string"
+  ));
+}
 
-  openSource.href = source.openUrl || source.url;
+function handlePlaybackFailure(reason) {
+  if (playbackFailureHandled || activeSourceIndex < 0) return;
+  playbackFailureHandled = true;
+  failedSourceIndexes.add(activeSourceIndex);
+
+  const nextIndex = findFallbackSourceIndex();
+  if (nextIndex >= 0) {
+    sourceSelect.value = String(nextIndex);
+    showMessage(
+      `${reason} Trying source ${nextIndex + 1} of ${currentSources.length} automatically.`,
+      "info"
+    );
+    window.setTimeout(() => {
+      attachSource(currentSources[nextIndex], nextIndex, { keepMessage: true });
+    }, 0);
+    return;
+  }
+
+  const failedSource = currentSources[activeSourceIndex];
+  updateSourceActions(failedSource);
+  destroyPlayer();
+  playerPlaceholderText.textContent = "Direct playback is blocked. Open the exact media source in a new tab.";
+  showMessage(
+    "The browser could not play the available sources directly. Open source now points to the exact media URL, not the original video page.",
+    "info"
+  );
+}
+
+function attachSource(source, sourceIndex = currentSources.indexOf(source), options = {}) {
+  destroyPlayer();
+  if (!options.keepMessage) clearMessage();
+
+  activeSourceIndex = sourceIndex;
+  playbackFailureHandled = false;
+  updateSourceActions(source);
 
   if (source.kind === "embed") {
     let embedUrl;
@@ -188,7 +278,7 @@ function attachSource(source) {
       }
       embedUrl.searchParams.set("origin", window.location.origin);
     } catch {
-      showMessage("The embedded player URL is invalid.");
+      handlePlaybackFailure("The embedded player URL is invalid.");
       return;
     }
 
@@ -201,7 +291,6 @@ function attachSource(source) {
   if (source.kind === "hls") {
     if (videoPlayer.canPlayType("application/vnd.apple.mpegurl")) {
       videoPlayer.src = source.url;
-      markPlayerReady();
       return;
     }
 
@@ -219,15 +308,13 @@ function attachSource(source) {
       hlsInstance.on(window.Hls.Events.MANIFEST_PARSED, markPlayerReady);
       hlsInstance.on(window.Hls.Events.ERROR, (_event, data) => {
         if (data?.fatal) {
-          showMessage(
-            "The HLS stream was found, but the browser could not load it. The URL may have expired or the source server may block cross-site playback."
-          );
+          handlePlaybackFailure("The HLS source could not be loaded in this browser.");
         }
       });
       return;
     }
 
-    showMessage("This browser does not support HLS playback.");
+    handlePlaybackFailure("This browser does not support HLS playback.");
     return;
   }
 
@@ -237,36 +324,48 @@ function attachSource(source) {
       dashInstance.initialize(videoPlayer, source.url, false);
       dashInstance.on(window.dashjs.MediaPlayer.events.STREAM_INITIALIZED, markPlayerReady);
       dashInstance.on(window.dashjs.MediaPlayer.events.ERROR, () => {
-        showMessage(
-          "The MPEG-DASH manifest was found but could not be loaded. The source may block CORS or the URL may have expired."
-        );
+        handlePlaybackFailure("The MPEG-DASH source could not be loaded in this browser.");
       });
       return;
     }
 
-    showMessage("The MPEG-DASH player failed to load. Use Open source instead.", "info");
+    handlePlaybackFailure("The MPEG-DASH player is unavailable.");
     return;
   }
 
   videoPlayer.src = source.url;
   if (source.mimeType) videoPlayer.setAttribute("type", source.mimeType);
-  markPlayerReady();
+  videoPlayer.load();
 
-  if (source.hasVideo && source.hasAudio === false) {
+  if (source.hasVideo && source.hasAudio === false && !options.keepMessage) {
     showMessage("This format contains video only. Select another format to include audio.", "info");
-  } else if (source.kind === "audio") {
+  } else if (source.kind === "audio" && !options.keepMessage) {
     showMessage("The selected source contains audio only.", "info");
   }
 }
 
-function renderResult(result) {
-  currentSources = Array.isArray(result.sources) ? result.sources : [];
-  sourceSelect.replaceChildren();
+function describeResult(result, index) {
+  const title = translateServerText(result.title || `Video ${index + 1}`);
+  const host = result.sourceHost || "Media source";
+  return `${index + 1}. ${title} · ${host}`;
+}
 
-  currentSources.forEach((source, index) => {
+function renderSelectedResult(index) {
+  const result = currentResults[index];
+  if (!result) return;
+
+  mediaSelect.value = String(index);
+  currentSources = Array.isArray(result.sources) ? result.sources : [];
+  activeSourceIndex = -1;
+  failedSourceIndexes = new Set();
+  playbackFailureHandled = false;
+  sourceSelect.replaceChildren();
+  clearMessage();
+
+  currentSources.forEach((source, sourceIndex) => {
     const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = describeSource(source, index);
+    option.value = String(sourceIndex);
+    option.textContent = describeSource(source, sourceIndex);
     sourceSelect.append(option);
   });
 
@@ -277,11 +376,26 @@ function renderResult(result) {
   );
   resultSection.hidden = false;
 
-  if (currentSources[0]) attachSource(currentSources[0]);
+  if (currentSources[0]) attachSource(currentSources[0], 0);
 
   if (Array.isArray(result.warnings) && result.warnings.length && message.hidden) {
     showMessage(result.warnings.map(translateServerText).join(" "), "info");
   }
+}
+
+function renderResults(results) {
+  currentResults = results;
+  mediaSelect.replaceChildren();
+
+  currentResults.forEach((result, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = describeResult(result, index);
+    mediaSelect.append(option);
+  });
+
+  mediaSwitcher.hidden = currentResults.length <= 1;
+  renderSelectedResult(0);
 
   requestAnimationFrame(() => {
     resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -317,12 +431,16 @@ async function postResolver(endpoint, url) {
   };
 }
 
-async function resolveUrl(url) {
-  setLoading(true, "Checking direct source");
+function resolverProgressLabel(label, index, total) {
+  return total > 1 ? `${label} ${index + 1}/${total}` : label;
+}
+
+async function resolveUrl(url, index = 0, total = 1) {
+  setLoading(true, resolverProgressLabel("Checking direct source", index, total));
   const fastResult = await postResolver("/api/resolve", url);
   if (fastResult.ok) return fastResult.result;
 
-  setLoading(true, "Running universal resolver");
+  setLoading(true, resolverProgressLabel("Running universal resolver", index, total));
   const universalResult = await postResolver("/api/universal", url);
   if (universalResult.ok) return universalResult.result;
 
@@ -341,51 +459,101 @@ form.addEventListener("submit", async (event) => {
 
   const value = urlInput.value.trim();
   if (!value) {
-    showMessage("Enter a video or page URL first.");
+    showMessage("Enter at least one video or page URL first.");
     urlInput.focus();
     return;
   }
 
-  let parsed;
-  try {
-    parsed = new URL(value);
-  } catch {
-    showMessage("The URL format is invalid. Use a complete address beginning with http:// or https://.");
+  const { urls, invalid } = parseInputUrls(value);
+  if (invalid.length) {
+    showMessage(`Invalid URL: ${invalid[0]}. Use complete HTTP or HTTPS addresses.`);
+    urlInput.focus();
+    return;
+  }
+  if (!urls.length) {
+    showMessage("No valid HTTP or HTTPS URL was found.");
+    urlInput.focus();
+    return;
+  }
+  if (urls.length > MAX_BATCH_URLS) {
+    showMessage(`A maximum of ${MAX_BATCH_URLS} URLs can be processed at once.`);
     urlInput.focus();
     return;
   }
 
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    showMessage("Only HTTP or HTTPS URLs are supported.");
-    return;
-  }
-
-  setLoading(true, "Processing URL");
+  setLoading(true, resolverProgressLabel("Processing", 0, urls.length));
   resultSection.hidden = true;
+  mediaSwitcher.hidden = true;
+  currentResults = [];
+  currentSources = [];
   destroyPlayer();
 
+  const resolved = [];
+  const failures = [];
+
   try {
-    const result = await resolveUrl(parsed.href);
-    renderResult(result);
+    for (let index = 0; index < urls.length; index += 1) {
+      try {
+        const result = await resolveUrl(urls[index], index, urls.length);
+        resolved.push({ ...result, inputUrl: urls[index] });
+      } catch (error) {
+        failures.push({
+          index,
+          url: urls[index],
+          error: error instanceof Error ? error.message : "The URL could not be processed."
+        });
+      }
+    }
+
+    if (!resolved.length) {
+      throw new Error(failures[0]?.error || "None of the submitted URLs could be resolved.");
+    }
+
+    renderResults(resolved);
     urlInput.value = "";
+
+    if (failures.length) {
+      const failedNumbers = failures.map((item) => item.index + 1).join(", ");
+      showMessage(
+        `Resolved ${resolved.length} of ${urls.length} URLs. Failed item${failures.length > 1 ? "s" : ""}: ${failedNumbers}.`,
+        "info"
+      );
+    } else if (resolved.length > 1) {
+      showMessage(`Resolved all ${resolved.length} URLs. Use Resolved media to switch videos.`, "info");
+    }
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : "An error occurred while processing the URL.");
+    showMessage(error instanceof Error ? error.message : "An error occurred while processing the URLs.");
   } finally {
     setLoading(false);
   }
 });
 
+urlInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+
+mediaSelect.addEventListener("change", () => {
+  renderSelectedResult(Number(mediaSelect.value));
+});
+
 sourceSelect.addEventListener("change", () => {
-  const source = currentSources[Number(sourceSelect.value)];
-  if (source) attachSource(source);
+  const sourceIndex = Number(sourceSelect.value);
+  const source = currentSources[sourceIndex];
+  if (!source) return;
+  failedSourceIndexes = new Set();
+  attachSource(source, sourceIndex);
 });
 
 copySource.addEventListener("click", async () => {
   const source = currentSources[Number(sourceSelect.value)];
-  if (!source) return;
+  const actionUrl = sourceActionUrl(source);
+  if (!actionUrl) return;
 
   try {
-    await navigator.clipboard.writeText(source.openUrl || source.url);
+    await navigator.clipboard.writeText(actionUrl);
     const originalLabel = copySource.textContent;
     copySource.textContent = "Copied";
     setTimeout(() => {
@@ -426,17 +594,23 @@ aboutDialog.addEventListener("click", (event) => {
 });
 aboutDialog.addEventListener("close", () => aboutOpen.focus());
 
+videoPlayer.addEventListener("loadedmetadata", markPlayerReady);
+videoPlayer.addEventListener("canplay", markPlayerReady);
 videoPlayer.addEventListener("error", () => {
-  showMessage(
-    "The source was found, but the media could not be played directly. Try another format or use Open source."
-  );
+  if (!videoPlayer.currentSrc || videoPlayer.error?.code === 1) return;
+  handlePlaybackFailure("The selected source could not be played directly.");
 });
 
 function clearTransientSession() {
   if (aboutDialog.open) aboutDialog.close();
   urlInput.value = "";
+  currentResults = [];
   currentSources = [];
+  activeSourceIndex = -1;
+  failedSourceIndexes = new Set();
+  mediaSelect.replaceChildren();
   sourceSelect.replaceChildren();
+  mediaSwitcher.hidden = true;
   openSource.removeAttribute("href");
   resultSection.hidden = true;
   clearMessage();

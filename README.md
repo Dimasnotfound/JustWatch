@@ -5,7 +5,7 @@
 <h1 align="center">Just Watch</h1>
 
 <p align="center">
-  <strong>Just paste. Press Watch. No pop-ups.</strong><br />
+  <strong>Paste one or more links. Press Watch. No pop-ups.</strong><br />
   <sub>No redirects. No source-page ads. Just the media.</sub>
 </p>
 
@@ -53,7 +53,7 @@
 
 ## What is Just Watch?
 
-Just Watch accepts a public video or media-page URL, resolves available playback sources, and returns them to the browser without hosting the media file itself.
+Just Watch accepts one or more public video or media-page URLs, resolves available playback sources, and returns them to the browser without hosting the media files. The interface supports up to 10 URLs per batch, separated by commas, spaces, semicolons, or new lines.
 
 The resolver uses a layered approach:
 
@@ -70,7 +70,10 @@ The resolver uses a layered approach:
 
 ## Highlights
 
-- **Minimal interface** focused on one action: paste a URL and press **Watch**.
+- **Minimal interface** focused on one action: paste one or more URLs and press **Watch**.
+- **Batch input** for up to 10 URLs separated by commas, spaces, semicolons, or new lines.
+- **Automatic playback fallback** that tries the next resolved source when the browser rejects the current one.
+- **Exact source actions** that open and copy the selected media URL instead of a nested player page.
 - **Layered resolver** for fast direct extraction and broad fallback coverage.
 - **Direct playback** from the original host instead of storing video files.
 - **HLS support** through `hls.js`.
@@ -182,7 +185,7 @@ vercel.json           Vercel Functions and response-header configuration
 Just Watch is designed not to keep a local URL history.
 
 - The URL input uses `autocomplete="off"`.
-- The input is cleared after a successful resolve.
+- The input is cleared after a batch produces at least one successful result.
 - The application does not write URLs to `localStorage` or `sessionStorage`.
 - Submitted URLs are not placed in the page query string or browser History API.
 - Resolver API responses use `Cache-Control: no-store`.

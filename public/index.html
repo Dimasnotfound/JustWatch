@@ -125,25 +125,25 @@
           </div>
 
           <form id="resolver-form" class="resolver-form" autocomplete="off" novalidate>
-            <label class="sr-only" for="video-url">Public video or media page URL</label>
+            <label class="sr-only" for="video-url">Public video or media page URLs</label>
             <div class="input-row">
-              <div class="url-field">
+              <div class="url-field url-field-multiple">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M10.6 13.4a2 2 0 0 0 2.8 0l3-3a2 2 0 0 0-2.8-2.8l-1 1M13.4 10.6a2 2 0 0 0-2.8 0l-3 3a2 2 0 1 0 2.8 2.8l1-1" />
                 </svg>
-                <input
+                <textarea
                   id="video-url"
-                  type="url"
+                  rows="4"
                   inputmode="url"
                   autocomplete="off"
                   autocapitalize="off"
                   autocorrect="off"
                   spellcheck="false"
                   data-lpignore="true"
-                  placeholder="Enter video URL"
+                  placeholder="Paste one or more video URLs&#10;Separate them with commas, spaces, or new lines"
                   aria-describedby="resolver-help"
                   required
-                />
+                ></textarea>
               </div>
 
               <button id="submit-button" type="submit">
@@ -151,9 +151,9 @@
                 <span class="button-spinner" aria-hidden="true"></span>
               </button>
             </div>
-            <p id="resolver-help" class="sr-only">
-              Enter a public, unprotected media URL. Just Watch does not bypass login, paywalls,
-              DRM, or private access controls.
+            <p id="resolver-help" class="resolver-help">
+              Paste up to 10 public URLs. Separate multiple links with commas, spaces, semicolons,
+              or new lines. Press Ctrl + Enter to start.
             </p>
           </form>
 
@@ -167,6 +167,11 @@
               <h2 id="result-title">Video found</h2>
             </div>
             <span id="source-host" class="source-host">Media source</span>
+          </div>
+
+          <div id="media-switcher" class="media-switcher source-field" hidden>
+            <label for="media-select">Resolved media</label>
+            <select id="media-select" aria-label="Select resolved media"></select>
           </div>
 
           <div class="player-frame">

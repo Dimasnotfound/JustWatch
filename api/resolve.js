@@ -1191,10 +1191,7 @@ async function resolveNestedPlayerPages(html, finalUrl, responseHeaders) {
       if (sources.length) {
         const metadata = pageMetadata(nestedHtml, fetched.finalUrl);
         return {
-          sources: sources.map((source) => ({
-            ...source,
-            openUrl: fetched.finalUrl
-          })),
+          sources,
           title: nestedResult?.title || metadata.title,
           thumbnail: nestedResult?.thumbnail,
           sourceHost: metadata.sourceHost,
